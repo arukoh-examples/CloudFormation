@@ -10,7 +10,7 @@
       "AllowedPattern" : "(?!-)[a-zA-Z0-9-.]{1,63}(?<!-)",
       "ConstraintDescription" : "must be a valid DNS zone name."
     },
-    
+
     "InstanceType" : {
       "Description"   : "WebServer EC2 instance type",
       "Type"          : "String",
@@ -31,7 +31,7 @@
       "Type"        : "AWS::EC2::KeyPair::KeyName",
       "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
     },
-    
+
     "OAuthProvider" : {
       "Description"   : "oauth2 provider name",
       "Type"          : "String",
@@ -39,33 +39,35 @@
       "AllowedValues" : [ "google", "github" ],
       "ConstraintDescription" : "must be a valid name."
     },
-    
+
     "OAuthClientID" : {
-      "Description"   : "oauth2 cilent id",
-      "Type"          : "String"
+      "Description" : "oauth2 cilent id",
+      "NoEcho"      : "true",
+      "Type"        : "String"
     },
-    
+
     "OAuthClientSecret" : {
-      "Description"   : "oauth2 client secret",
-      "Type"          : "String"
+      "Description" : "oauth2 client secret",
+      "NoEcho"      : "true",
+      "Type"        : "String"
     },
-    
+
     "OAuthRedirectPath" : {
-      "Description"   : "your app redirect_path for the service. if the service is Google, path is always '/oauth2callback'",
-      "Type"          : "String",
-      "Default"       : "oauth2callback"
+      "Description" : "your app redirect_path for the service. if the service is Google, path is always '/oauth2callback'",
+      "Type"        : "String",
+      "Default"     : "/oauth2callback"
     },
-    
+
     "OAuthRestrictions" : {
-      "Description"   : "Comma-delimited list of restrict user request",
-      "Type"          : "CommaDelimitedList",
-      "Default"       : "yourdomain.com, example@gmail.com, your_company_org"
+      "Description" : "Comma-delimited list of restrict user request",
+      "Type"        : "CommaDelimitedList",
+      "Default"     : "yourdomain.com, example@gmail.com, your_company_org"
     },
-    
+
     "SSLCertificateName" : {
-      "Description"   : "The name for the server certificate. Include the path (it defaults to a slash) in this value.",
-      "Type"          : "String",
-      "Default"       : "/example.com"
+      "Description" : "The name for the server certificate. Include the path (it defaults to a slash) in this value.",
+      "Type"        : "String",
+      "Default"     : "/example.com"
     },
 
     "SSHLocation" : {
@@ -210,7 +212,7 @@
                 "group"   : "root"
               }
             },
-            
+
             "commands" : {
               "01_ec2_create_tags" : {
                 "command" : "/tmp/ec2_create_tags.sh",
@@ -218,7 +220,7 @@
               }
             }
           },
-          
+
           "install_cfn" : {
             "files" : {
               "/etc/cfn/cfn-hup.conf" : {
@@ -253,16 +255,16 @@
             "services" : {
               "sysvinit" : {  
                 "cfn-hup" : { "enabled" : "true", "ensureRunning" : "true",
-                              "files" : ["/etc/cfn/cfn-hup.conf", "/etc/cfn/hooks.d/cfn-auto-reloader.conf"]}
+                  "files" : ["/etc/cfn/cfn-hup.conf", "/etc/cfn/hooks.d/cfn-auto-reloader.conf"]}
               }
             }
           },
-          
+
           "install_gate" : {
             "sources" : {
               "/opt/gate" : "https://github.com/typester/gate/releases/download/v0.4/gate_0.4_linux_amd64.tar.gz"
             },
-            
+
             "files" : {
               "/etc/gate/config.yml.erb" : {
                 "content": { "Fn::Join" : ["", [
@@ -286,14 +288,14 @@
                   "    client_id: ", { "Ref" : "OAuthClientID" }, "\n",
                   "    client_secret: ", { "Ref" : "OAuthClientSecret" }, "\n",
                   "    # your app redirect_url for the service: if the service is Google, path is always \"/oauth2callback\"\n",
-                  "    redirect_url: https://", {"Ref" : "AWS::StackName"}, ".", {"Ref" : "HostedZone"}, "/", { "Ref" : "OAuthRedirectPath" }, "\n",
+                  "    redirect_url: https://", {"Ref" : "AWS::StackName"}, ".", {"Ref" : "HostedZone"}, { "Ref" : "OAuthRedirectPath" }, "\n",
                   "\n",
                   "# # restrict user request. (optional)\n",
                   "restrictions:\n",
                   "#   - yourdomain.com    # domain of your Google App (Google)\n",
                   "#   - example@gmail.com # specific email address (same as above)\n",
                   "#   - your_company_org  # organization name (GitHub)\n",
-                  "   - ", {"Fn::Join" : [ "\n   - ", { "Ref" : "OAuthRestrictions" }] }, "\n"
+                  "   - ", {"Fn::Join" : [ "\n   - ", { "Ref" : "OAuthRestrictions" }] }, "\n",
                   "\n",
                   "# document root for static files\n",
                   "htdocs: /usr/share/nginx/html\n",
@@ -312,14 +314,14 @@
                 "owner"  : "root",
                 "group"  : "root"
               },
-              
+
               "/etc/init.d/gate" : {
                 "source" : "https://raw.githubusercontent.com/arukoh/CloudFormation/master/front/etc/init.d/gate",
                 "mode"   : "000755",
                 "owner"  : "root",
                 "group"  : "root"
               },
-              
+
               "/etc/logrotate.d/gate" : {
                 "source" : "https://raw.githubusercontent.com/arukoh/CloudFormation/master/front/etc/logrotate.d/gate",
                 "mode"   : "000644",
@@ -343,14 +345,14 @@
               }
             }
           },
-          
+
           "install_nginx" : {
             "packages" : {
               "yum" : {
                 "nginx" : []
               }
             },
-            
+
             "files" : {
               "/etc/nginx/nginx.conf" : {
                 "source" : "https://raw.githubusercontent.com/arukoh/CloudFormation/master/front/etc/nginx/nginx.conf",
@@ -472,13 +474,7 @@
           "PolicyName"     : "EC2AccessPolicy",
           "PolicyDocument" : {
             "Version"   : "2012-10-17",
-            "Statement" : [
-              {
-                "Action"    : [ "ec2:CreateTags", "ec2:Describe*" ],
-                "Effect"    : "Allow",
-                "Resource"  : "*"
-              }
-            ]
+            "Statement" : [ { "Action" : ["ec2:CreateTags", "ec2:Describe*"], "Effect" : "Allow", "Resource" : "*" } ]
           }
         }
         ]
@@ -509,7 +505,7 @@
       "Properties" : {
         "HostedZoneName"  : { "Fn::Join" : [ "", [{"Ref" : "HostedZone"}, "." ]]},
         "Comment"         : "CNAME redirect to aws.amazon.com.",
-        "Name"            : { "Fn::Join" : [ "", [{"Ref" : "AWS::StackName"}, {"Ref" : "HostedZone"}, "."]]},
+        "Name"            : { "Fn::Join" : [ "", [{"Ref" : "AWS::StackName"}, ".", {"Ref" : "HostedZone"}, "."]]},
         "Type"            : "CNAME",
         "TTL"             : "900",
         "ResourceRecords" : [{ "Fn::GetAtt" : [ "ElasticLoadBalancer", "DNSName" ]}]
