@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+# gate        Startup script for the gate
+#
+# chkconfig: - 85 15
+# description: gate is a static file server and reverse proxy integrated with OAuth2 account authentication.
+# processname: gate
+# pidfile: /var/run/gate/gate.pid
+#
+### BEGIN INIT INFO
+# Provides:          gate
+# Required-Start:    $local_fs $remote_fs $network $named
+# Required-Stop:     $local_fs $remote_fs $network
+# Should-Start:      $time
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: start and stop gate
+# Description:       gate is a static file server and reverse proxy integrated with OAuth2 account authentication.
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+prog="gate"
+sysconfig="/etc/sysconfig/$prog"
+
+[ -f $sysconfig ] && . $sysconfig
+
+binfile=${BINFILE-/usr/bin/gate}
+conffile=${CONFFILE-/etc/gate/config.yml}
+
+piddir="/var/run/$prog"
+logdir="/var/log/$prog"
+pidfile="$piddir/$prog.pid"
+logfile="$logdir/$prog.log"
+
+[ -d $piddir ] || mkdir -p $piddir
+[ -d $logdir ] || mkdir -p $logdir
+
+RETVAL=0
+
+start() {
+  echo -n $"Starting $prog: "
+  if [ -f "$pidfile" ]; then
+    echo -n "$prog already running: `cat $pidfile`"
+    RETVAL=1
+  else
+    nohup $binfile -conf $conffile >> "$logfile" 2>&1&
+    pid=$!
+    kill -0 $pid > /dev/null 2>&1
+    if [ $? = 0 ]; then
+      echo $pid > $pidfile
+      RETVAL=0
+      success
+    else
+      RETVAL=1
+      failure
+    fi
+  fi
+  echo
+}	
+
+stop() {
+  if [ -f "$pidfile" ]; then
+    echo -n $"Stopping $prog: "
+    killproc -p $pidfile $prog
+    RETVAL=$?
+    [ $RETVAL = 0 ] && rm -f $pidfile
+  else
+    echo -n "$prog is not running"
+    RETVAL=1
+  fi
+  echo
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  status)
+        status $prog
+        RETVAL=$?
+        ;;
+  restart)
+        stop
+        start
+        ;;
+  *)
+        echo "Usage: $prog {start|stop|status|restart}"
+        RETVAL=1
+        ;;
+esac
+exit $RETVAL
+

@@ -1,0 +1,526 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "AWS CloudFormation Template front",
+
+  "Parameters" : {
+    "HostedZone" : {
+      "Type" : "String",
+      "Description" : "The DNS name of an existing Amazon Route 53 hosted zone",
+      "AllowedPattern" : "(?!-)[a-zA-Z0-9-.]{1,63}(?<!-)",
+      "ConstraintDescription" : "must be a valid DNS zone name."
+    },
+    
+    "InstanceType" : {
+      "Description"   : "WebServer EC2 instance type",
+      "Type"          : "String",
+      "Default"       : "m1.small",
+      "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.small", "m1.medium", "m3.medium", "c1.medium" ],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+
+    "OperatorEMail": {
+      "Description"    : "EMail address to notify if there are any scaling operations",
+      "Type"           : "String",
+      "AllowedPattern" : "([a-zA-Z0-9_\\-\\.]+)@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.)|(([a-zA-Z0-9\\-]+\\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\\]?)",
+      "ConstraintDescription" : "must be a valid email address."
+    },
+
+    "KeyName" : {
+      "Description" : "The EC2 Key Pair to allow SSH access to the instances",
+      "Type"        : "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
+    },
+    
+    "OAuthProvider" : {
+      "Description"   : "oauth2 provider name",
+      "Type"          : "String",
+      "Default"       : "google",
+      "AllowedValues" : [ "google", "github" ],
+      "ConstraintDescription" : "must be a valid name."
+    },
+    
+    "OAuthClientID" : {
+      "Description"   : "oauth2 cilent id",
+      "Type"          : "String"
+    },
+    
+    "OAuthClientSecret" : {
+      "Description"   : "oauth2 client secret",
+      "Type"          : "String"
+    },
+    
+    "OAuthRedirectPath" : {
+      "Description"   : "your app redirect_path for the service. if the service is Google, path is always '/oauth2callback'",
+      "Type"          : "String",
+      "Default"       : "oauth2callback"
+    },
+    
+    "OAuthRestrictions" : {
+      "Description"   : "Comma-delimited list of restrict user request",
+      "Type"          : "CommaDelimitedList",
+      "Default"       : "yourdomain.com, example@gmail.com, your_company_org"
+    },
+    
+    "SSLCertificateName" : {
+      "Description"   : "The name for the server certificate. Include the path (it defaults to a slash) in this value.",
+      "Type"          : "String",
+      "Default"       : "/example.com"
+    },
+
+    "SSHLocation" : {
+      "Description"    : "The IP address range that can be used to SSH to the EC2 instances",
+      "Type"           : "String",
+      "MinLength"      : "9",
+      "MaxLength"      : "18",
+      "Default"        : "0.0.0.0/0",
+      "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+    }
+  },
+
+  "Mappings" : {
+    "AWSInstanceType2Arch" : {
+      "t1.micro"    : { "Arch" : "PV64"   },
+      "t2.micro"    : { "Arch" : "HVM64"  },
+      "t2.small"    : { "Arch" : "HVM64"  },
+      "t2.medium"   : { "Arch" : "HVM64"  },
+      "m1.small"    : { "Arch" : "PV64"   },
+      "m1.medium"   : { "Arch" : "PV64"   },
+      "m1.large"    : { "Arch" : "PV64"   },
+      "m1.xlarge"   : { "Arch" : "PV64"   },
+      "m2.xlarge"   : { "Arch" : "PV64"   },
+      "m2.2xlarge"  : { "Arch" : "PV64"   },
+      "m2.4xlarge"  : { "Arch" : "PV64"   },
+      "m3.medium"   : { "Arch" : "HVM64"  },
+      "m3.large"    : { "Arch" : "HVM64"  },
+      "m3.xlarge"   : { "Arch" : "HVM64"  },
+      "m3.2xlarge"  : { "Arch" : "HVM64"  },
+      "c1.medium"   : { "Arch" : "PV64"   },
+      "c1.xlarge"   : { "Arch" : "PV64"   },
+      "c3.large"    : { "Arch" : "HVM64"  },
+      "c3.xlarge"   : { "Arch" : "HVM64"  },
+      "c3.2xlarge"  : { "Arch" : "HVM64"  },
+      "c3.4xlarge"  : { "Arch" : "HVM64"  },
+      "c3.8xlarge"  : { "Arch" : "HVM64"  },
+      "c4.large"    : { "Arch" : "HVM64"  },
+      "c4.xlarge"   : { "Arch" : "HVM64"  },
+      "c4.2xlarge"  : { "Arch" : "HVM64"  },
+      "c4.4xlarge"  : { "Arch" : "HVM64"  },
+      "c4.8xlarge"  : { "Arch" : "HVM64"  },
+      "g2.2xlarge"  : { "Arch" : "HVMG2"  },
+      "r3.large"    : { "Arch" : "HVM64"  },
+      "r3.xlarge"   : { "Arch" : "HVM64"  },
+      "r3.2xlarge"  : { "Arch" : "HVM64"  },
+      "r3.4xlarge"  : { "Arch" : "HVM64"  },
+      "r3.8xlarge"  : { "Arch" : "HVM64"  },
+      "i2.xlarge"   : { "Arch" : "HVM64"  },
+      "i2.2xlarge"  : { "Arch" : "HVM64"  },
+      "i2.4xlarge"  : { "Arch" : "HVM64"  },
+      "i2.8xlarge"  : { "Arch" : "HVM64"  },
+      "d2.xlarge"   : { "Arch" : "HVM64"  },
+      "d2.2xlarge"  : { "Arch" : "HVM64"  },
+      "d2.4xlarge"  : { "Arch" : "HVM64"  },
+      "d2.8xlarge"  : { "Arch" : "HVM64"  },
+      "hi1.4xlarge" : { "Arch" : "HVM64"  },
+      "hs1.8xlarge" : { "Arch" : "HVM64"  },
+      "cr1.8xlarge" : { "Arch" : "HVM64"  },
+      "cc2.8xlarge" : { "Arch" : "HVM64"  }
+    },
+
+    "AWSRegionArch2AMI" : {
+      "us-east-1"      : {"PV64" : "ami-1ccae774", "HVM64" : "ami-10cae778", "HVMG2" : "ami-8c6b40e4"},
+      "us-west-2"      : {"PV64" : "ami-ff527ecf", "HVM64" : "ami-e9527ed9", "HVMG2" : "ami-abbe919b"},
+      "us-west-1"      : {"PV64" : "ami-d514f291", "HVM64" : "ami-cb14f28f", "HVMG2" : "ami-f31ffeb7"},
+      "eu-west-1"      : {"PV64" : "ami-bf0897c8", "HVM64" : "ami-a30897d4", "HVMG2" : "ami-d5bc24a2"},
+      "eu-central-1"   : {"PV64" : "ami-ac221fb1", "HVM64" : "ami-ae221fb3", "HVMG2" : "ami-7cd2ef61"},
+      "ap-northeast-1" : {"PV64" : "ami-27f90e27", "HVM64" : "ami-c7f90ec7", "HVMG2" : "ami-6318e863"},
+      "ap-southeast-1" : {"PV64" : "ami-acd9e8fe", "HVM64" : "ami-64d8e936", "HVMG2" : "ami-3807376a"},
+      "ap-southeast-2" : {"PV64" : "ami-ff9cecc5", "HVM64" : "ami-f39cecc9", "HVMG2" : "ami-89790ab3"},
+      "sa-east-1"      : {"PV64" : "ami-bb2890a6", "HVM64" : "ami-b72890aa", "HVMG2" : "NOT_SUPPORTED"},
+      "cn-north-1"     : {"PV64" : "ami-fa39abc3", "HVM64" : "ami-e839abd1", "HVMG2" : "NOT_SUPPORTED"}
+    }
+  },
+
+  "Resources" : {
+    "NotificationTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "Subscription": [ { "Endpoint": { "Ref": "OperatorEMail" }, "Protocol": "email" } ]
+      }
+    },
+
+    "WebServerGroup" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "AvailabilityZones"         : { "Fn::GetAZs" : ""},
+        "LaunchConfigurationName"   : { "Ref" : "LaunchConfig" },
+        "MinSize"                   : "1",
+        "MaxSize"                   : "3",
+        "LoadBalancerNames"         : [ { "Ref" : "ElasticLoadBalancer" } ],
+        "NotificationConfiguration" : {
+          "TopicARN"          : { "Ref" : "NotificationTopic" },
+          "NotificationTypes" : [
+            "autoscaling:EC2_INSTANCE_LAUNCH",
+            "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+            "autoscaling:EC2_INSTANCE_TERMINATE",
+            "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"
+          ]
+        }
+      },
+
+      "CreationPolicy" : {
+        "ResourceSignal" : {
+          "Timeout" : "PT15M",
+          "Count"   : "1"
+        }
+      },
+
+      "UpdatePolicy": {
+        "AutoScalingRollingUpdate": {
+          "MinInstancesInService" : "1",
+          "MaxBatchSize"          : "1",
+          "PauseTime"             : "PT24H",
+          "WaitOnResourceSignals" : "true"
+        }
+      }
+    },
+
+    "LaunchConfig" : {
+      "Type"     : "AWS::AutoScaling::LaunchConfiguration",
+      "Metadata" : {
+        "Comment" : "Setup front",
+        "AWS::CloudFormation::Init" : {
+          "configSets" : {
+            "full_install" : [ "init", "install_cfn", "install_gate", "install_nginx" ]
+          },
+
+          "init" : {
+            "files" : {
+              "/tmp/ec2_create_tags.sh" : {
+                "content" : { "Fn::Join" : ["", [
+                  "#!/bin/sh\n",
+                  { "Fn::Join" : ["", ["EC2_NAME=", {"Ref" : "AWS::StackName"}, ".`date +%s`\n"]] },
+                  "INSTANCE_ID=`curl -s http://169.254.169.254/latest/meta-data/instance-id/`\n",
+                  "\n",
+                  "aws ec2 create-tags --resources ${INSTANCE_ID} --tags \"Key=Name,Value=${EC2_NAME}\"\n"
+                ]]},
+                "mode"    : "000500",
+                "owner"   : "root",
+                "group"   : "root"
+              }
+            },
+            
+            "commands" : {
+              "01_ec2_create_tags" : {
+                "command" : "/tmp/ec2_create_tags.sh",
+                "env"     : { "AWS_DEFAULT_REGION" : {"Ref" : "AWS::Region"} }
+              }
+            }
+          },
+          
+          "install_cfn" : {
+            "files" : {
+              "/etc/cfn/cfn-hup.conf" : {
+                "content" : { "Fn::Join" : ["", [
+                  "[main]\n",
+                  "stack=", { "Ref" : "AWS::StackId" }, "\n",
+                  "region=", { "Ref" : "AWS::Region" }, "\n"
+                ]]},
+                "mode"    : "000400",
+                "owner"   : "root",
+                "group"   : "root"
+              },
+
+              "/etc/cfn/hooks.d/cfn-auto-reloader.conf" : {
+                "content": { "Fn::Join" : ["", [
+                  "[cfn-auto-reloader-hook]\n",
+                  "triggers=post.update\n",
+                  "path=Resources.LaunchConfig.Metadata.AWS::CloudFormation::Init\n",
+                  "action=/opt/aws/bin/cfn-init -v ",
+                  "         --stack ", { "Ref" : "AWS::StackName" },
+                  "         --resource LaunchConfig ",
+                  "         --configsets full_install ",
+                  "         --region ", { "Ref" : "AWS::Region" }, "\n",
+                  "runas=root\n"
+                ]]},
+                "mode"    : "000400",
+                "owner"   : "root",
+                "group"   : "root"
+              }
+            },
+
+            "services" : {
+              "sysvinit" : {  
+                "cfn-hup" : { "enabled" : "true", "ensureRunning" : "true",
+                              "files" : ["/etc/cfn/cfn-hup.conf", "/etc/cfn/hooks.d/cfn-auto-reloader.conf"]}
+              }
+            }
+          },
+          
+          "install_gate" : {
+            "sources" : {
+              "/opt/gate" : "https://github.com/typester/gate/releases/download/v0.4/gate_0.4_linux_amd64.tar.gz"
+            },
+            
+            "files" : {
+              "/etc/gate/config.yml.erb" : {
+                "content": { "Fn::Join" : ["", [
+                  "# address to bind\n",
+                  "address: :9999\n",
+                  "\n",
+                  "# # ssl keys (optional)\n",
+                  "# ssl:\n",
+                  "#   cert: ./ssl/ssl.cer\n",
+                  "#   key: ./ssl/ssl.key\n",
+                  "\n",
+                  "auth:\n",
+                  "  session:\n",
+                  "    # authentication key for cookie store\n",
+                  "    key: <%= SecureRandom.hex(64) %>\n",
+                  "\n",
+                  "  info:\n",
+                  "    # oauth2 provider name (`google` or `github`)\n",
+                  "    service: ", { "Ref" : "OAuthProvider" }, "\n",
+                  "    # your app keys for the service\n",
+                  "    client_id: ", { "Ref" : "OAuthClientID" }, "\n",
+                  "    client_secret: ", { "Ref" : "OAuthClientSecret" }, "\n",
+                  "    # your app redirect_url for the service: if the service is Google, path is always \"/oauth2callback\"\n",
+                  "    redirect_url: https://", {"Ref" : "AWS::StackName"}, ".", {"Ref" : "HostedZone"}, "/", { "Ref" : "OAuthRedirectPath" }, "\n",
+                  "\n",
+                  "# # restrict user request. (optional)\n",
+                  "restrictions:\n",
+                  "#   - yourdomain.com    # domain of your Google App (Google)\n",
+                  "#   - example@gmail.com # specific email address (same as above)\n",
+                  "#   - your_company_org  # organization name (GitHub)\n",
+                  "   - ", {"Fn::Join" : [ "\n   - ", { "Ref" : "OAuthRestrictions" }] }, "\n"
+                  "\n",
+                  "# document root for static files\n",
+                  "htdocs: /usr/share/nginx/html\n",
+                  "\n",
+                  "# proxy definitions\n",
+                  "proxy:\n",
+                  "  - path: /elasticsearch\n",
+                  "    dest: http://127.0.0.1:9200\n",
+                  "    strip_path: yes\n",
+                  "\n",
+                  "  - path: /influxdb\n",
+                  "    dest: http://127.0.0.1:8086\n",
+                  "    strip_path: yes\n"
+                ]]},
+                "mode"   : "000644",
+                "owner"  : "root",
+                "group"  : "root"
+              },
+              
+              "/etc/init.d/gate" : {
+                "source" : "https://raw.githubusercontent.com/arukoh/CloudFormation/master/front/etc/init.d/gate",
+                "mode"   : "000755",
+                "owner"  : "root",
+                "group"  : "root"
+              },
+              
+              "/etc/logrotate.d/gate" : {
+                "source" : "https://raw.githubusercontent.com/arukoh/CloudFormation/master/front/etc/logrotate.d/gate",
+                "mode"   : "000644",
+                "owner"  : "root",
+                "group"  : "root"
+              }
+            },
+
+            "commands" : {
+              "01_create_symlink" : {
+                "command" : "ln -s /opt/gate/gate_0.4_linux_amd64/gate /usr/bin/gate"
+              },
+              "02_erb_config" : {
+                "command" : "erb -r securerandom /etc/gate/config.yml.erb > /etc/gate/config.yml"
+              }
+            },
+
+            "services" : {
+              "sysvinit" : {
+                "gate" : { "enabled" : "true", "ensureRunning" : "true" }
+              }
+            }
+          },
+          
+          "install_nginx" : {
+            "packages" : {
+              "yum" : {
+                "nginx" : []
+              }
+            },
+            
+            "files" : {
+              "/etc/nginx/nginx.conf" : {
+                "source" : "https://raw.githubusercontent.com/arukoh/CloudFormation/master/front/etc/nginx/nginx.conf",
+                "mode"    : "000644",
+                "owner"   : "root",
+                "group"   : "root"
+              }
+            },
+
+            "services" : {
+              "sysvinit" : {
+                "nginx" : { "enabled" : "true", "ensureRunning" : "true" }
+              }
+            }
+          }
+        }
+      },
+      "Properties" : {
+        "KeyName"            : { "Ref" : "KeyName" },
+        "SecurityGroups"     : [ { "Ref" : "InstanceSecurityGroup" } ],
+        "InstanceType"       : { "Ref" : "InstanceType" },
+        "IamInstanceProfile" : { "Ref" : "IAMInstanceProfile" },
+        "ImageId"            : { "Fn::FindInMap" : ["AWSRegionArch2AMI", {"Ref" : "AWS::Region"}, {"Fn::FindInMap" : ["AWSInstanceType2Arch", {"Ref" : "InstanceType"}, "Arch"]}] },
+        "UserData"           : { "Fn::Base64" : { "Fn::Join" : ["", [
+          "#!/bin/bash -xe\n",
+          "yum update -y aws-cfn-bootstrap\n",
+
+          "/opt/aws/bin/cfn-init -v ",
+          "         --stack ", { "Ref" : "AWS::StackName" },
+          "         --resource LaunchConfig ",
+          "         --configsets full_install ",
+          "         --region ", { "Ref" : "AWS::Region" }, "\n",
+
+          "/opt/aws/bin/cfn-signal -e $? ",
+          "         --stack ", { "Ref" : "AWS::StackName" },
+          "         --resource WebServerGroup ",
+          "         --region ", { "Ref" : "AWS::Region" }, "\n"
+        ]]}}
+      }
+    },
+
+    "WebServerScaleUpPolicy" : {
+      "Type"       : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType"       : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "WebServerGroup" },
+        "Cooldown"             : "60",
+        "ScalingAdjustment"    : "1"
+      }
+    },
+
+    "WebServerScaleDownPolicy" : {
+      "Type"       : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType"       : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "WebServerGroup" },
+        "Cooldown"             : "60",
+        "ScalingAdjustment"    : "-1"
+      }
+    },
+
+    "CPUAlarmHigh": {
+      "Type"       : "AWS::CloudWatch::Alarm",
+      "Properties" : {
+        "AlarmDescription"   : "Scale-up if CPU > 90% for 10 minutes",
+        "MetricName"         : "CPUUtilization",
+        "Namespace"          : "AWS/EC2",
+        "Statistic"          : "Average",
+        "Period"             : "300",
+        "EvaluationPeriods"  : "2",
+        "Threshold"          : "90",
+        "AlarmActions"       : [ { "Ref": "WebServerScaleUpPolicy" } ],
+        "Dimensions"         : [ { "Name": "AutoScalingGroupName", "Value": { "Ref": "WebServerGroup" } } ],
+        "ComparisonOperator" : "GreaterThanThreshold"
+      }
+    },
+    "CPUAlarmLow": {
+      "Type"       : "AWS::CloudWatch::Alarm",
+      "Properties" : {
+        "AlarmDescription"   : "Scale-down if CPU < 70% for 10 minutes",
+        "MetricName"         : "CPUUtilization",
+        "Namespace"          : "AWS/EC2",
+        "Statistic"          : "Average",
+        "Period"             : "300",
+        "EvaluationPeriods"  : "2",
+        "Threshold"          : "70",
+        "AlarmActions"       : [ { "Ref": "WebServerScaleDownPolicy" } ],
+        "Dimensions"         : [ { "Name": "AutoScalingGroupName", "Value": { "Ref": "WebServerGroup" } } ],
+        "ComparisonOperator" : "LessThanThreshold"
+      }
+    },
+
+    "ElasticLoadBalancer" : {
+      "Type"       : "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties" : {
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
+        "CrossZone"         : "true",
+        "Listeners"         : [ { "LoadBalancerPort" : "443", "InstancePort" : "80", "Protocol" : "HTTPS", "SSLCertificateId" : {"Fn::Join":["", ["arn:aws:iam::", {"Ref" : "AWS::AccountId"}, ":server-certificate", {"Ref" : "SSLCertificateName"}]]} } ],
+        "HealthCheck"       : { "Target" : "HTTP:80/healthcheck", "HealthyThreshold" : "3", "UnhealthyThreshold" : "5", "Interval" : "30", "Timeout" : "5" }
+      }
+    },
+
+    "IAMRole" : {
+      "Type"       : "AWS::IAM::Role",
+      "Properties" : {
+        "AssumeRolePolicyDocument" : {
+          "Version"   : "2012-10-17",
+          "Statement" : [
+            {
+            "Effect"    : "Allow",
+            "Principal" : { "Service" : [ "ec2.amazonaws.com" ] },
+            "Action"    : [ "sts:AssumeRole" ]
+          }
+          ]
+        },
+        "Path"     : "/",
+        "Policies" : [
+          {
+          "PolicyName"     : "EC2AccessPolicy",
+          "PolicyDocument" : {
+            "Version"   : "2012-10-17",
+            "Statement" : [
+              {
+                "Action"    : [ "ec2:CreateTags", "ec2:Describe*" ],
+                "Effect"    : "Allow",
+                "Resource"  : "*"
+              }
+            ]
+          }
+        }
+        ]
+      }
+    },
+
+    "IAMInstanceProfile": {
+      "Type"       : "AWS::IAM::InstanceProfile",
+      "Properties" : {
+        "Path"  : "/",
+        "Roles" : [ { "Ref": "IAMRole" } ]
+      }
+    },
+
+    "InstanceSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription"     : "Enable SSH access and HTTP from the load balancer only",
+        "SecurityGroupIngress" : [
+          { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : { "Ref" : "SSHLocation"} },
+          { "IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "SourceSecurityGroupOwnerId" : {"Fn::GetAtt" : ["ElasticLoadBalancer", "SourceSecurityGroup.OwnerAlias"]}, "SourceSecurityGroupName" : {"Fn::GetAtt" : ["ElasticLoadBalancer", "SourceSecurityGroup.GroupName"]} }
+        ]
+      }
+    },
+
+    "DNSRecord" : {
+      "Type" : "AWS::Route53::RecordSet",
+      "Properties" : {
+        "HostedZoneName"  : { "Fn::Join" : [ "", [{"Ref" : "HostedZone"}, "." ]]},
+        "Comment"         : "CNAME redirect to aws.amazon.com.",
+        "Name"            : { "Fn::Join" : [ "", [{"Ref" : "AWS::StackName"}, {"Ref" : "HostedZone"}, "."]]},
+        "Type"            : "CNAME",
+        "TTL"             : "900",
+        "ResourceRecords" : [{ "Fn::GetAtt" : [ "ElasticLoadBalancer", "DNSName" ]}]
+      }
+    }
+  },
+
+  "Outputs" : {
+    "URL" : {
+      "Description" : "The URL of the website",
+      "Value"       : { "Fn::Join" : ["", ["https://", { "Ref" : "DNSRecord" }]]}
+    }
+  }
+}
