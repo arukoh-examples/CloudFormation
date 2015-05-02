@@ -1,0 +1,4 @@
+MAILTO=""
+
+00 2 * * * curator --host localhost -b <%= ENV['CURATOR_BLOOM_DAYS']  ||  2 %> -c <%= ENV['CURATOR_CLOSE_DAYS']  || 14 %> -d <%= ENV['CURATOR_DELETE_DAYS'] || 21 %> --time-unit days
+
